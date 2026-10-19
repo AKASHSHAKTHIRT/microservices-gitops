@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments
+---
+# Live traffic. Argo Rollouts points this at the active (blue) ReplicaSet and
+# flips it to green on promotion.
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-gateway-active
+  namespace: payments
+spec:
+  selector:
+    app: payment-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# Points at the new (green) ReplicaSet while it is being verified.
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-gateway-preview
+  namespace: payments
+spec:
+  selector:
+    app: payment-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -1,0 +1,22 @@
+# Probes the canary directly (bypassing the weighted Ingress) and aborts the
+# rollout if it returns errors. Swap the `web` provider for a `prometheus`
+# provider (error-rate / latency queries) once you have Prometheus installed.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: catalog-canary-check
+  namespace: catalog
+spec:
+  args:
+    - name: canary-host
+  metrics:
+    - name: canary-items-endpoint
+      interval: 5s
+      count: 6
+      failureLimit: 1
+      consecutiveErrorLimit: 2
+      successCondition: result.id == 1
+      provider:
+        web:
+          url: http://{{ args.canary-host }}/items/1
+          timeoutSeconds: 3

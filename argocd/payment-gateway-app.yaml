@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payment-gateway
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # Replace with your fork/repo once this is pushed.
+    repoURL: https://github.com/AKASHSHAKTHIRT/microservices-gitops.git
+    targetRevision: main
+    path: k8s/payment-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: payments
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

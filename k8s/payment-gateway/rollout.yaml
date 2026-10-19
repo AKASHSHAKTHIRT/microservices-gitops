@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: payment-gateway
+  namespace: payments
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: payment-gateway
+  template:
+    metadata:
+      labels:
+        app: payment-gateway
+    spec:
+      containers:
+        - name: payment-gateway
+          image: rtakashdev/payment-gateway:v1
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+  strategy:
+    blueGreen:
+      activeService: payment-gateway-active
+      previewService: payment-gateway-preview
+      # Payments are high risk: a human promotes the green stack after the
+      # pre-promotion smoke test has passed.
+      autoPromotionEnabled: false
+      # Keep blue running briefly after promotion so rollback is instant.
+      scaleDownDelaySeconds: 120
+      prePromotionAnalysis:
+        templates:
+          - templateName: payment-smoke-test
+        args:
+          - name: host
+            value: payment-gateway-preview.payments.svc.cluster.local
+      postPromotionAnalysis:
+        templates:
+          - templateName: payment-smoke-test
+        args:
+          - name: host
+            value: payment-gateway-active.payments.svc.cluster.local

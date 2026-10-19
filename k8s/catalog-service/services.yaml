@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: catalog
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service-stable
+  namespace: catalog
+spec:
+  selector:
+    app: catalog-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service-canary
+  namespace: catalog
+spec:
+  selector:
+    app: catalog-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

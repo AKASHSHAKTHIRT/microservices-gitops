@@ -1,0 +1,42 @@
+# Gate for the CD repo: every change (including the image-tag bumps that CI opens
+# or pushes) must render with kustomize and pass schema validation, Argo Rollouts
+# CRDs included, before Argo CD is allowed to sync it.
+name: validate-manifests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  KUBECONFORM_VERSION: v0.6.7
+  # Schemas for CRDs (Rollout, AnalysisTemplate, Application) come from this catalog.
+  CRD_SCHEMAS: "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | tar xz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Render and validate each service
+        run: |
+          for dir in k8s/*/; do
+            echo "::group::${dir}"
+            kubectl kustomize "$dir" | kubeconform -strict -summary \
+              -schema-location default -schema-location "$CRD_SCHEMAS"
+            echo "::endgroup::"
+          done
+
+      - name: Validate Argo CD applications
+        run: |
+          kubeconform -strict -summary \
+            -schema-location default -schema-location "$CRD_SCHEMAS" argocd/

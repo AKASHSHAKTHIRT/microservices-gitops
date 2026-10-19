@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payment-gateway
+  namespace: payments
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: payments.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: payment-gateway-active
+                port:
+                  name: http
+    # Reach the green stack from outside the cluster before promoting it.
+    - host: payments-preview.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: payment-gateway-preview
+                port:
+                  name: http

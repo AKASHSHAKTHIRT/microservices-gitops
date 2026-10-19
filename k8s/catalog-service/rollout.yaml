@@ -1,0 +1,64 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: catalog-service
+  namespace: catalog
+spec:
+  replicas: 4
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      containers:
+        - name: catalog-service
+          image: rtakashdev/catalog-service:v1
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+  strategy:
+    canary:
+      # Argo Rollouts keeps these two Services pointed at the stable / canary
+      # ReplicaSets and shifts real traffic weight via the nginx canary Ingress.
+      stableService: catalog-service-stable
+      canaryService: catalog-service-canary
+      trafficRouting:
+        nginx:
+          stableIngress: catalog-service
+      steps:
+        - setWeight: 20
+        - pause: { duration: 30s }
+        - analysis:
+            templates:
+              - templateName: catalog-canary-check
+            args:
+              - name: canary-host
+                value: catalog-service-canary.catalog.svc.cluster.local
+        - setWeight: 50
+        - pause: { duration: 30s }
+        - setWeight: 80
+        - pause: { duration: 30s }
+        # After the last step the canary is promoted to 100% automatically.

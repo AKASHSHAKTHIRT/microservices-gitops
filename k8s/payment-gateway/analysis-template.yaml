@@ -1,0 +1,45 @@
+# Runs a one-off Job that exercises the gateway end to end with a sandbox token:
+# readiness, create payment, idempotent replay, refund. Any failing step fails
+# the Job, which fails the analysis and blocks promotion (pre) or triggers
+# a rollback (post).
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: payment-smoke-test
+  namespace: payments
+spec:
+  args:
+    - name: host
+  metrics:
+    - name: payment-smoke-test
+      provider:
+        job:
+          spec:
+            backoffLimit: 1
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: smoke
+                    image: curlimages/curl:8.10.1
+                    command: ["sh", "-c"]
+                    args:
+                      - |
+                        set -eu
+                        BASE="http://{{ args.host }}"
+                        KEY="smoke-$(date +%s)-$$"
+
+                        curl -fsS "$BASE/readyz" >/dev/null
+
+                        BODY='{"amount":100,"currency":"INR","source_token":"tok_visa","description":"rollout smoke test"}'
+                        P1=$(curl -fsS -X POST "$BASE/payments" -H "Content-Type: application/json" -H "Idempotency-Key: $KEY" -d "$BODY")
+                        echo "$P1" | grep -q '"status":"captured"'
+
+                        # Replaying the same key must return the same payment.
+                        P2=$(curl -fsS -X POST "$BASE/payments" -H "Content-Type: application/json" -H "Idempotency-Key: $KEY" -d "$BODY")
+                        ID1=$(echo "$P1" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+                        ID2=$(echo "$P2" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+                        [ -n "$ID1" ] && [ "$ID1" = "$ID2" ]
+
+                        curl -fsS -X POST "$BASE/payments/$ID1/refund" | grep -q '"status":"refunded"'
+                        echo "smoke test passed against $BASE"
