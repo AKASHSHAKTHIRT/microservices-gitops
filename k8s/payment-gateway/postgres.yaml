@@ -1,0 +1,82 @@
+# PostgreSQL for payment-gateway. One instance with a persistent volume, so every
+# gateway pod (blue and green) reads and writes the same payments.
+# Credentials live in the Secret "payments-db", created by hand (see README); it is
+# deliberately NOT in git.
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-db
+  namespace: payments
+spec:
+  selector:
+    app: payments-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: payments-db
+  namespace: payments
+spec:
+  serviceName: payments-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments-db
+  template:
+    metadata:
+      labels:
+        app: payments-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: payments
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payments-db
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payments-db
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

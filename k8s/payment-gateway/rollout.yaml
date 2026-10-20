@@ -20,6 +20,25 @@ spec:
           ports:
             - name: http
               containerPort: 8000
+          env:
+            # Shared PostgreSQL (see postgres.yaml). The app refuses to start without it,
+            # so a pod can never silently fall back to private in-memory state.
+            - name: REQUIRE_DATABASE
+              value: "true"
+            - name: PGHOST
+              value: payments-db
+            - name: PGDATABASE
+              value: payments
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: payments-db
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payments-db
+                  key: password
           readinessProbe:
             httpGet:
               path: /readyz
