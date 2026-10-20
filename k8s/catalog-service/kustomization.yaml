@@ -10,4 +10,4 @@ resources:
 # Argo CD syncs the change and Argo Rollouts runs the canary.
 images:
   - name: rtakashdev/catalog-service
-    newTag: b6-524a9cd
+    newTag: b7-7d3ba09
