@@ -10,4 +10,4 @@ resources:
 # Argo Rollouts brings up green and waits for a manual promote.
 images:
   - name: rtakashdev/payment-gateway
-    newTag: b9-4426c9d
+    newTag: b12-8d3a711
